@@ -1,0 +1,48 @@
+#Work with data in a Spark dataframe
+#Inferring a schema
+%%pyspark
+df = spark.read.load('Files/data/products.csv',
+    format='csv',
+    header=True
+)
+display(df.limit(10))
+####################
+#Specifying an explicit schema
+from pyspark.sql.types import *
+from pyspark.sql.functions import *
+
+productSchema = StructType([
+    StructField("ProductID", IntegerType()),
+    StructField("ProductName", StringType()),
+    StructField("Category", StringType()),
+    StructField("ListPrice", FloatType())
+    ])
+
+df = spark.read.load('Files/data/product-data.csv',
+    format='csv',
+    schema=productSchema,
+    header=False)
+display(df.limit(10))
+####################
+#Filtering and grouping dataframes
+#most data manipulation methods, select returns a new dataframe object.
+pricelist_df = df.select("ProductID", "ListPrice")
+#Selecting a subset of columns from a dataframe is a common operation, which can also be achieved by using the following shorter syntax:
+pricelist_df = df["ProductID", "ListPrice"]
+###You can "chain" methods together to perform a series of manipulations that results in a transformed dataframe. For example, this example code chains the select and where methods to create a new dataframe containing the ProductName and ListPrice columns for products with a category of Mountain Bikes or Road Bikes:
+bikes_df = df.select("ProductName", "Category", "ListPrice").where((df["Category"]=="Mountain Bikes") | (df["Category"]=="Road Bikes"))
+display(bikes_df)
+##############################
+#group and aggregate data
+counts_df = df.select("ProductID", "Category").groupBy("Category").count()
+display(counts_df)
+##############################
+#saves the dataFrame into a parquet file in the data lake, replacing any existing file of the same name.
+bikes_df.write.mode("overwrite").parquet('Files/product_data/bikes.parquet')
+##############################
+#Partitioning the output file
+bikes_df.write.partitionBy("Category").mode("overwrite").parquet("Files/bike_data")
+##############################
+#Load partitioned data
+road_bikes_df = spark.read.parquet('Files/bike_data/Category=Road Bikes')
+display(road_bikes_df.limit(5))
